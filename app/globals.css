@@ -1,0 +1,317 @@
+@import "tailwindcss";
+
+:root {
+  --background: #030305;
+  --foreground: #f8f4ec;
+  --gold: #d4af37;
+  --gold-light: #f5e6a3;
+  --gold-dark: #8a6d1f;
+  --gold-glow: rgba(212, 175, 55, 0.45);
+  --card-bg: rgba(12, 11, 18, 0.82);
+  --card-border: rgba(212, 175, 55, 0.18);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-gold-dark: var(--gold-dark);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-cinzel);
+  --font-game: var(--font-orbitron);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+.font-display {
+  font-family: var(--font-cinzel), Georgia, serif;
+}
+
+.font-game {
+  font-family: var(--font-orbitron), system-ui, sans-serif;
+}
+
+.text-gold-glow {
+  text-shadow:
+    0 0 20px var(--gold-glow),
+    0 0 40px rgba(212, 175, 55, 0.15);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes crown-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg) scale(1);
+  }
+  33% {
+    transform: translateY(-8px) rotate(1deg) scale(1.03);
+  }
+  66% {
+    transform: translateY(-4px) rotate(-0.5deg) scale(1.01);
+  }
+}
+
+@keyframes crown-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 24px rgba(212, 175, 55, 0.5))
+      drop-shadow(0 0 70px rgba(212, 175, 55, 0.2))
+      drop-shadow(0 8px 32px rgba(0, 0, 0, 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 0 40px rgba(245, 230, 163, 0.75))
+      drop-shadow(0 0 100px rgba(212, 175, 55, 0.35))
+      drop-shadow(0 12px 40px rgba(0, 0, 0, 0.6));
+  }
+}
+
+@keyframes crown-shine {
+  0% {
+    opacity: 0;
+    transform: translateX(-120%) skewX(-20deg);
+  }
+  20%,
+  100% {
+    opacity: 0;
+    transform: translateX(120%) skewX(-20deg);
+  }
+  35% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.12;
+  }
+  100% {
+    transform: scale(0.92);
+    opacity: 0.55;
+  }
+}
+
+@keyframes pulse-ring-outer {
+  0% {
+    transform: scale(0.88);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.05;
+  }
+  100% {
+    transform: scale(0.88);
+    opacity: 0.3;
+  }
+}
+
+@keyframes grid-fade {
+  0%,
+  100% {
+    opacity: 0.025;
+  }
+  50% {
+    opacity: 0.055;
+  }
+}
+
+@keyframes float-orb {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate(12px, -18px) scale(1.08);
+    opacity: 0.55;
+  }
+}
+
+@keyframes sparkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-crown {
+  animation: crown-float 5s ease-in-out infinite, crown-glow 3.5s ease-in-out infinite;
+}
+
+.animate-crown-shine {
+  animation: crown-shine 4s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% auto;
+  animation: shimmer 3s linear infinite;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 3.5s ease-in-out infinite;
+}
+
+.animate-pulse-ring-outer {
+  animation: pulse-ring-outer 4.5s ease-in-out infinite;
+}
+
+.animate-grid {
+  animation: grid-fade 8s ease-in-out infinite;
+}
+
+.animate-float-orb {
+  animation: float-orb 7s ease-in-out infinite;
+}
+
+.animate-sparkle {
+  animation: sparkle 2.5s ease-in-out infinite;
+}
+
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }
+.delay-600 { animation-delay: 0.6s; }
+.delay-700 { animation-delay: 0.7s; }
+
+.card-premium {
+  background: linear-gradient(
+    145deg,
+    rgba(22, 20, 32, 0.9) 0%,
+    rgba(10, 9, 14, 0.95) 100%
+  );
+  border: 1px solid var(--card-border);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 40px rgba(212, 175, 55, 0.04);
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+}
+
+.card-premium:hover {
+  border-color: rgba(212, 175, 55, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.08) inset,
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(212, 175, 55, 0.08);
+  transform: translateY(-2px);
+}
+
+.card-king-history {
+  background: linear-gradient(
+    160deg,
+    rgba(16, 14, 24, 0.85) 0%,
+    rgba(8, 7, 12, 0.92) 100%
+  );
+  border: 1px solid rgba(212, 175, 55, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset,
+    0 2px 16px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s;
+}
+
+.card-king-history:hover {
+  border-color: rgba(212, 175, 55, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.06) inset,
+    0 6px 28px rgba(0, 0, 0, 0.45),
+    0 0 32px rgba(212, 175, 55, 0.06);
+  transform: translateY(-3px);
+}
+
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(212, 175, 55, 0.4) 20%,
+    rgba(212, 175, 55, 0.6) 50%,
+    rgba(212, 175, 55, 0.4) 80%,
+    transparent
+  );
+}
+
+.card-hall-of-fame {
+  background: linear-gradient(
+    155deg,
+    rgba(20, 18, 30, 0.9) 0%,
+    rgba(10, 9, 16, 0.95) 100%
+  );
+  border: 1px solid rgba(212, 175, 55, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+    0 4px 20px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+}
+
+.card-hall-of-fame:hover {
+  border-color: rgba(212, 175, 55, 0.32);
+  box-shadow:
+    0 0 0 1px rgba(212, 175, 55, 0.07) inset,
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 48px rgba(212, 175, 55, 0.07);
+  transform: translateY(-2px);
+}
+
+.card-hall-of-fame-reign {
+  border-color: rgba(120, 200, 190, 0.14);
+}
+
+.card-hall-of-fame-reign:hover {
+  border-color: rgba(120, 200, 190, 0.32);
+  box-shadow:
+    0 0 0 1px rgba(120, 200, 190, 0.07) inset,
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 48px rgba(78, 205, 196, 0.07);
+}
+
+.card-hall-season {
+  background: linear-gradient(
+    160deg,
+    rgba(14, 13, 22, 0.6) 0%,
+    rgba(8, 7, 12, 0.4) 100%
+  );
+  border: 1px solid rgba(212, 175, 55, 0.1);
+}
+
+.delay-800 { animation-delay: 0.8s; }
