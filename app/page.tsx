@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { addDoc, collection, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { db } from "./firebase";
-
+import { onAuthStateChanged, signInWithPopup, signOut, User } from "firebase/auth";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from "firebase/firestore";
+import { auth, db, googleProvider } from "./firebase";
 type CurrentKing = {
   name: string;
   country: string;
@@ -819,6 +830,7 @@ export default function Home() {
     amount: "",
     message: "",
   });
+  const [user, setUser] = useState<User | null>(null);
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsed((prev) => prev + 1);
@@ -848,50 +860,156 @@ export default function Home() {
 
   useEffect(() => {
     const donationsRef = collection(db, "donations");
-
+  
     const unsubscribe = onSnapshot(donationsRef, (snapshot) => {
-      const donations = snapshot.docs.map((doc) => {
-        const data = doc.data();
-
-        return {
-          name: String(data.name || "Unknown"),
-          country: String(data.country || "Unknown"),
-          seasonTotal: Number(data.amount || 0),
-          latestDonation: Number(data.amount || 0),
-          message: String(data.message || ""),
-        };
+      const playersMap = new Map<string, RecentKing>();
+  
+      snapshot.docs.forEach((donationDoc) => {
+        const data = donationDoc.data();
+  
+        const name = String(data.name || "Unknown");
+        const country = String(data.country || "Unknown");
+        const amount = Number(data.amount || 0);
+        const message = String(data.message || "");
+  
+        const key = `${name.toLowerCase()}-${country.toLowerCase()}`;
+  
+        const existingPlayer = playersMap.get(key);
+  
+        if (existingPlayer) {
+          playersMap.set(key, {
+            ...existingPlayer,
+            seasonTotal: existingPlayer.seasonTotal + amount,
+            latestDonation: amount,
+            message,
+          });
+        } else {
+          playersMap.set(key, {
+            name,
+            country,
+            seasonTotal: amount,
+            latestDonation: amount,
+            message,
+          });
+        }
       });
-
-      setFirebaseDonations(donations);
+  
+      const groupedDonations = Array.from(playersMap.values()).sort(
+        (a, b) => b.seasonTotal - a.seasonTotal
+      );
+  
+      setFirebaseDonations(groupedDonations);
     });
-
+  
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+  
+      if (currentUser) {
+        const userRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDoc(userRef);
+  
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            name: currentUser.displayName || "Unknown",
+            email: currentUser.email || "",
+            country: "",
+            crowns: 0,
+            seasonTotal: 0,
+            totalDonated: 0,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+    });
+  
+    return () => unsubscribe();
+  }, []);
+
+  async function handleLogin() {
+    await signInWithPopup(auth, googleProvider);
+  }
+
+  async function handleLogout() {
+    await signOut(auth);
+  }
+
   async function handleBecomeKing(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
   
+    if (!user) {
+      alert("Please login with Google first.");
+      return;
+    }
+  
     const amountNumber = Number(formData.amount);
   
-    if (!formData.name || !formData.country || !formData.message || amountNumber <= 0) {
+    if (!formData.country || !formData.message || amountNumber <= 0) {
       alert("Please fill all fields correctly.");
       return;
     }
   
-    await setDoc(doc(db, "currentKing", "current"), {
-      name: formData.name,
-      country: formData.country,
-      amount: amountNumber,
-      message: formData.message,
-      timestamp: new Date().toISOString(),
-    });
+    const playerName = user.displayName || "Unknown";
+    const playerEmail = user.email || "";
+    const playerId = user.uid;
+  
+    const playerDonationsQuery = query(
+      collection(db, "donations"),
+      where("userId", "==", playerId)
+    );
+  
+    const playerDonationsSnapshot = await getDocs(playerDonationsQuery);
+  
+    const previousTotal = playerDonationsSnapshot.docs.reduce((sum, donationDoc) => {
+      const data = donationDoc.data();
+      return sum + Number(data.amount || 0);
+    }, 0);
+  
+    const newPlayerTotal = previousTotal + amountNumber;
   
     await addDoc(collection(db, "donations"), {
-      name: formData.name,
+      userId: playerId,
+      email: playerEmail,
+      name: playerName,
       country: formData.country,
       amount: amountNumber,
       message: formData.message,
       timestamp: serverTimestamp(),
     });
+  
+    await setDoc(
+      doc(db, "users", playerId),
+      {
+        name: playerName,
+        email: playerEmail,
+        country: formData.country,
+        seasonTotal: newPlayerTotal,
+        totalDonated: newPlayerTotal,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  
+    if (newPlayerTotal > firebaseKing.amount) {
+      await setDoc(doc(db, "currentKing", "current"), {
+        userId: playerId,
+        email: playerEmail,
+        name: playerName,
+        country: formData.country,
+        amount: newPlayerTotal,
+        message: formData.message,
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      alert(
+        `Donation saved. Your season total is ${formatCurrency(
+          newPlayerTotal
+        )}. You need more than ${formatCurrency(firebaseKing.amount)} to become king.`
+      );
+    }
   
     setFormData({
       name: "",
@@ -903,6 +1021,29 @@ export default function Home() {
     setShowForm(false);
   }
   return (
+    <>
+      <div className="fixed right-4 top-4 z-50">
+  {user ? (
+    <div className="rounded-xl border border-gold/20 bg-black/70 p-3 text-right backdrop-blur">
+      <p className="text-sm font-bold text-white">{user.displayName}</p>
+      <p className="text-xs text-zinc-500">{user.email}</p>
+      <button
+        onClick={handleLogout}
+        className="mt-2 rounded-lg border border-gold/20 px-3 py-1 text-xs text-gold"
+      >
+        Logout
+      </button>
+    </div>
+  ) : (
+    <button
+      onClick={handleLogin}
+      className="rounded-xl border border-gold/30 bg-black/70 px-4 py-2 text-sm font-bold text-gold backdrop-blur"
+    >
+      Login with Google
+    </button>
+  )}
+</div>
+
     <div className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none fixed inset-0 bg-[#030305]" />
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_90%_60%_at_50%_-5%,rgba(212,175,55,0.22),transparent_55%)]" />
@@ -1083,7 +1224,7 @@ export default function Home() {
             <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
             {(firebaseDonations.length > 0 ? firebaseDonations : MOCK_RECENT_KINGS).map((king, index) => (
                 <RecentKingCard
-                  key={king.name}
+                key={`${king.name}-${king.country}-${index}`}
                   king={king}
                   rank={index + 1}
                   className={
@@ -1104,7 +1245,8 @@ export default function Home() {
           <SeasonInfoSection />
           <BiggestDonationSection />
         </main>
-      </div>
+        </div>
     </div>
+  </>
   );
 }
