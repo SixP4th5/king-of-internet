@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import { addDoc, collection, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { db } from "./firebase";
 
 type CurrentKing = {
   name: string;
@@ -802,13 +804,104 @@ function BiggestDonationSection() {
 export default function Home() {
   const [elapsed, setElapsed] = useState(MOCK_KING.timeAsKingSeconds);
 
+  const [firebaseKing, setFirebaseKing] = useState({
+    name: MOCK_KING.name,
+    country: MOCK_KING.country,
+    amount: MOCK_KING.seasonTotal,
+    message: MOCK_KING.latestMessage,
+  });
+
+  const [firebaseDonations, setFirebaseDonations] = useState<RecentKing[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    country: "",
+    amount: "",
+    message: "",
+  });
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsed((prev) => prev + 1);
     }, 1000);
+
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const kingRef = doc(db, "currentKing", "current");
+
+    const unsubscribe = onSnapshot(kingRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+
+        setFirebaseKing({
+          name: String(data.name || "No King Yet"),
+          country: String(data.country || "None"),
+          amount: Number(data.amount || 0),
+          message: String(data.message || "Be the first king"),
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const donationsRef = collection(db, "donations");
+
+    const unsubscribe = onSnapshot(donationsRef, (snapshot) => {
+      const donations = snapshot.docs.map((doc) => {
+        const data = doc.data();
+
+        return {
+          name: String(data.name || "Unknown"),
+          country: String(data.country || "Unknown"),
+          seasonTotal: Number(data.amount || 0),
+          latestDonation: Number(data.amount || 0),
+          message: String(data.message || ""),
+        };
+      });
+
+      setFirebaseDonations(donations);
+    });
+
+    return () => unsubscribe();
+  }, []);
+  async function handleBecomeKing(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+  
+    const amountNumber = Number(formData.amount);
+  
+    if (!formData.name || !formData.country || !formData.message || amountNumber <= 0) {
+      alert("Please fill all fields correctly.");
+      return;
+    }
+  
+    await setDoc(doc(db, "currentKing", "current"), {
+      name: formData.name,
+      country: formData.country,
+      amount: amountNumber,
+      message: formData.message,
+      timestamp: new Date().toISOString(),
+    });
+  
+    await addDoc(collection(db, "donations"), {
+      name: formData.name,
+      country: formData.country,
+      amount: amountNumber,
+      message: formData.message,
+      timestamp: serverTimestamp(),
+    });
+  
+    setFormData({
+      name: "",
+      country: "",
+      amount: "",
+      message: "",
+    });
+  
+    setShowForm(false);
+  }
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none fixed inset-0 bg-[#030305]" />
@@ -870,13 +963,13 @@ export default function Home() {
                   <div>
                     <Label>Name</Label>
                     <p className="mt-1.5 font-display text-2xl font-bold text-white sm:text-3xl">
-                      {MOCK_KING.name}
+                    {firebaseKing.name}
                     </p>
                   </div>
                   <div className="text-right">
                     <Label>Country</Label>
                     <p className="mt-1.5 font-display text-2xl font-bold text-white sm:text-3xl">
-                      {MOCK_KING.country}
+                    {firebaseKing.country}
                     </p>
                   </div>
                 </div>
@@ -885,7 +978,7 @@ export default function Home() {
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-gold/5 via-transparent to-gold/5" />
                   <Label>Total donated this season</Label>
                   <p className="relative mt-1 font-display text-4xl font-black text-gold sm:text-5xl">
-                    {formatCurrency(MOCK_KING.seasonTotal)}
+                  {formatCurrency(firebaseKing.amount)}
                   </p>
                   <div className="relative mt-3 border-t border-gold/10 pt-3">
                     <p className="font-game text-[10px] tracking-[0.15em] text-zinc-500 uppercase">
@@ -903,7 +996,7 @@ export default function Home() {
                 <div>
                   <Label>Latest message</Label>
                   <p className="mt-2 text-base leading-relaxed text-zinc-300 sm:text-lg">
-                    &ldquo;{MOCK_KING.latestMessage}&rdquo;
+                    &ldquo;{firebaseKing.message}&rdquo;
                   </p>
                 </div>
 
@@ -922,16 +1015,59 @@ export default function Home() {
 
 <button
   type="button"
+  onClick={() => setShowForm(true)}
   className="animate-fade-up delay-600 group relative mt-8 w-full max-w-md overflow-hidden rounded-2xl px-8 py-5 font-game text-base font-bold tracking-[0.25em] text-black uppercase transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_50px_rgba(212,175,55,0.45)] active:scale-[0.98] sm:mt-10 sm:py-6 sm:text-lg"
   style={{
     background:
       "linear-gradient(135deg, #fff8dc 0%, #f5e6a3 15%, #d4af37 45%, #c9a227 55%, #f5e6a3 85%, #fff8dc 100%)",
-  }}
+  }} 
 >
   <span className="animate-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
   <span className="relative drop-shadow-sm">BECOME KING</span>
 </button>
+{showForm && (
+  <form
+    onSubmit={handleBecomeKing}
+    className="mt-6 w-full max-w-md space-y-3 rounded-2xl border border-gold/20 bg-black/40 p-5 text-left"
+  >
+    <input
+      className="w-full rounded-xl border border-gold/20 bg-black/60 px-4 py-3 text-white outline-none"
+      placeholder="Your name"
+      value={formData.name}
+      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+    />
 
+    <input
+      className="w-full rounded-xl border border-gold/20 bg-black/60 px-4 py-3 text-white outline-none"
+      placeholder="Country"
+      value={formData.country}
+      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+    />
+
+    <input
+      className="w-full rounded-xl border border-gold/20 bg-black/60 px-4 py-3 text-white outline-none"
+      placeholder="Amount"
+      type="number"
+      value={formData.amount}
+      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+    />
+
+    <input
+      className="w-full rounded-xl border border-gold/20 bg-black/60 px-4 py-3 text-white outline-none"
+      placeholder="Message"
+      maxLength={50}
+      value={formData.message}
+      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+    />
+
+    <button
+      type="submit"
+      className="w-full rounded-xl bg-gold px-4 py-3 font-bold text-black"
+    >
+      SUBMIT TEST KING
+    </button>
+  </form>
+)}
 {/* Recent Kings */}
           <section className="animate-fade-up delay-400 mt-14 w-full sm:mt-16">
             <div className="section-divider mb-8 sm:mb-10" />
@@ -945,7 +1081,7 @@ export default function Home() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
-              {MOCK_RECENT_KINGS.map((king, index) => (
+            {(firebaseDonations.length > 0 ? firebaseDonations : MOCK_RECENT_KINGS).map((king, index) => (
                 <RecentKingCard
                   key={king.name}
                   king={king}
