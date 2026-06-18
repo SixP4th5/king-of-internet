@@ -100,7 +100,13 @@ type HallOfFameSeason = {
   highestAmount: HallOfFameChampion & { seasonTotal: number };
   longestReign: HallOfFameChampion & { reignSeconds: number };
 };
-
+type UserProfile = {
+  nickname: string;
+  country: string;
+  crowns: number;
+  seasonTotal: number;
+  totalDonated: number;
+};
 const MOCK_HALL_OF_FAME: HallOfFameSeason[] = [
   {
     number: 1,
@@ -812,6 +818,18 @@ function BiggestDonationSection() {
     </section>
   );
 }
+const COUNTRIES = [
+  "🇧🇷 Brazil", "🇺🇸 United States", "🇬🇧 United Kingdom", "🇨🇦 Canada", "🇩🇪 Germany",
+  "🇫🇷 France", "🇯🇵 Japan", "🇰🇷 South Korea", "🇦🇺 Australia", "🇵🇹 Portugal",
+  "🇪🇸 Spain", "🇮🇹 Italy", "🇲🇽 Mexico", "🇦🇷 Argentina", "🇨🇱 Chile", "🇨🇴 Colombia",
+  "🇵🇪 Peru", "🇺🇾 Uruguay", "🇵🇾 Paraguay", "🇧🇴 Bolivia", "🇻🇪 Venezuela",
+  "🇳🇱 Netherlands", "🇧🇪 Belgium", "🇨🇭 Switzerland", "🇦🇹 Austria", "🇸🇪 Sweden",
+  "🇳🇴 Norway", "🇩🇰 Denmark", "🇫🇮 Finland", "🇵🇱 Poland", "🇮🇪 Ireland",
+  "🇨🇳 China", "🇮🇳 India", "🇮🇩 Indonesia", "🇵🇭 Philippines", "🇹🇭 Thailand",
+  "🇻🇳 Vietnam", "🇹🇷 Turkey", "🇸🇦 Saudi Arabia", "🇦🇪 United Arab Emirates",
+  "🇿🇦 South Africa", "🇳🇬 Nigeria", "🇪🇬 Egypt", "🇲🇦 Morocco", "🇷🇺 Russia",
+  "🇺🇦 Ukraine", "🇬🇷 Greece", "🇮🇱 Israel", "🇳🇿 New Zealand"
+];
 export default function Home() {
   const [elapsed, setElapsed] = useState(MOCK_KING.timeAsKingSeconds);
 
@@ -825,12 +843,11 @@ export default function Home() {
   const [firebaseDonations, setFirebaseDonations] = useState<RecentKing[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
-    name: "",
-    country: "",
     amount: "",
     message: "",
   });
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   useEffect(() => {
     const interval = setInterval(() => {
       setElapsed((prev) => prev + 1);
@@ -838,7 +855,10 @@ export default function Home() {
 
     return () => clearInterval(interval);
   }, []);
-
+  const [profileForm, setProfileForm] = useState({
+    nickname: "",
+    country: "",
+  });
   useEffect(() => {
     const kingRef = doc(db, "currentKing", "current");
 
@@ -857,7 +877,7 @@ export default function Home() {
 
     return () => unsubscribe();
   }, []);
-
+  const [profileLoading, setProfileLoading] = useState(false);
   useEffect(() => {
     const donationsRef = collection(db, "donations");
   
@@ -909,6 +929,8 @@ export default function Home() {
       setUser(currentUser);
   
       if (currentUser) {
+        setProfileLoading(true);
+  
         const userRef = doc(db, "users", currentUser.uid);
         const userSnap = await getDoc(userRef);
   
@@ -923,6 +945,25 @@ export default function Home() {
             createdAt: new Date().toISOString(),
           });
         }
+  
+        const freshSnap = await getDoc(userRef);
+  
+        if (freshSnap.exists()) {
+          const data = freshSnap.data();
+  
+          setUserProfile({
+            nickname: String(data.nickname || ""),
+            country: String(data.country || ""),
+            crowns: Number(data.crowns || 0),
+            seasonTotal: Number(data.seasonTotal || 0),
+            totalDonated: Number(data.totalDonated || 0),
+          });
+        }
+  
+        setProfileLoading(false);
+      } else {
+        setUserProfile(null);
+        setProfileLoading(false);
       }
     });
   
@@ -936,7 +977,37 @@ export default function Home() {
   async function handleLogout() {
     await signOut(auth);
   }
-
+  async function handleSaveProfile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+  
+    if (!user) {
+      alert("Please login first.");
+      return;
+    }
+  
+    if (!profileForm.nickname || !profileForm.country) {
+      alert("Choose a nickname and country.");
+      return;
+    }
+  
+    await setDoc(
+      doc(db, "users", user.uid),
+      {
+        nickname: profileForm.nickname,
+        country: profileForm.country,
+        updatedAt: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  
+    setUserProfile({
+      nickname: profileForm.nickname,
+      country: profileForm.country,
+      crowns: userProfile?.crowns || 0,
+      seasonTotal: userProfile?.seasonTotal || 0,
+      totalDonated: userProfile?.totalDonated || 0,
+    });
+  }
   async function handleBecomeKing(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
   
@@ -945,16 +1016,22 @@ export default function Home() {
       return;
     }
   
-    const amountNumber = Number(formData.amount);
-  
-    if (!formData.country || !formData.message || amountNumber <= 0) {
-      alert("Please fill all fields correctly.");
+    if (!userProfile?.nickname || !userProfile?.country) {
+      alert("Please set up your nickname and country first.");
       return;
     }
   
-    const playerName = user.displayName || "Unknown";
+    const amountNumber = Number(formData.amount);
+  
+    if (!formData.message || amountNumber <= 0) {
+      alert("Please fill amount and message correctly.");
+      return;
+    }
+  
     const playerEmail = user.email || "";
     const playerId = user.uid;
+    const playerName = userProfile.nickname;
+    const playerCountry = userProfile.country;
   
     const playerDonationsQuery = query(
       collection(db, "donations"),
@@ -974,7 +1051,7 @@ export default function Home() {
       userId: playerId,
       email: playerEmail,
       name: playerName,
-      country: formData.country,
+      country: playerCountry,
       amount: amountNumber,
       message: formData.message,
       timestamp: serverTimestamp(),
@@ -984,8 +1061,9 @@ export default function Home() {
       doc(db, "users", playerId),
       {
         name: playerName,
+        nickname: playerName,
         email: playerEmail,
-        country: formData.country,
+        country: playerCountry,
         seasonTotal: newPlayerTotal,
         totalDonated: newPlayerTotal,
         updatedAt: new Date().toISOString(),
@@ -993,12 +1071,18 @@ export default function Home() {
       { merge: true }
     );
   
+    setUserProfile({
+      ...userProfile,
+      seasonTotal: newPlayerTotal,
+      totalDonated: newPlayerTotal,
+    });
+  
     if (newPlayerTotal > firebaseKing.amount) {
       await setDoc(doc(db, "currentKing", "current"), {
         userId: playerId,
         email: playerEmail,
         name: playerName,
-        country: formData.country,
+        country: playerCountry,
         amount: newPlayerTotal,
         message: formData.message,
         timestamp: new Date().toISOString(),
@@ -1012,8 +1096,6 @@ export default function Home() {
     }
   
     setFormData({
-      name: "",
-      country: "",
       amount: "",
       message: "",
     });
@@ -1022,18 +1104,92 @@ export default function Home() {
   }
   return (
     <>
-      <div className="fixed right-4 top-4 z-50">
-  {user ? (
-    <div className="rounded-xl border border-gold/20 bg-black/70 p-3 text-right backdrop-blur">
-      <p className="text-sm font-bold text-white">{user.displayName}</p>
-      <p className="text-xs text-zinc-500">{user.email}</p>
-      <button
-        onClick={handleLogout}
-        className="mt-2 rounded-lg border border-gold/20 px-3 py-1 text-xs text-gold"
-      >
-        Logout
-      </button>
-    </div>
+      <div className="fixed right-4 top-4 z-[9999] max-w-[280px] rounded-2xl border border-gold/30 bg-black/90 p-4 text-left text-white shadow-[0_0_30px_rgba(212,175,55,0.25)] backdrop-blur">
+      {user ? (
+  profileLoading ? (
+    <div className="text-sm text-gold">Loading profile...</div>
+  ) :
+    !userProfile?.nickname || !userProfile?.country ? (
+      <form onSubmit={handleSaveProfile} className="space-y-3">
+        <p className="text-center text-sm font-bold text-gold">
+          SET UP YOUR KING PROFILE
+        </p>
+
+        <input
+          className="w-full rounded-xl border border-gold/20 bg-black/60 px-3 py-2 text-sm text-white outline-none"
+          placeholder="Choose nickname"
+          value={profileForm.nickname}
+          onChange={(e) =>
+            setProfileForm({ ...profileForm, nickname: e.target.value })
+          }
+        />
+
+        <select
+          className="w-full rounded-xl border border-gold/20 bg-black/60 px-3 py-2 text-sm text-white outline-none"
+          value={profileForm.country}
+          onChange={(e) =>
+            setProfileForm({ ...profileForm, country: e.target.value })
+          }
+        >
+         <option value="">Select country</option>
+{COUNTRIES.map((country) => (
+  <option key={country} value={country}>
+    {country}
+  </option>
+))}
+        </select>
+
+        <button
+          type="submit"
+          className="w-full rounded-xl bg-gold px-3 py-2 text-sm font-bold text-black"
+        >
+          SAVE PROFILE
+        </button>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full rounded-xl border border-gold/20 px-3 py-2 text-xs text-gold"
+        >
+          Logout
+        </button>
+      </form>
+    ) : (
+      <div className="rounded-xl border border-gold/20 bg-black/70 p-3 text-right backdrop-blur">
+        <p className="text-sm font-bold text-white">
+          {userProfile.nickname}
+        </p>
+
+        <p className="text-xs text-zinc-500">{user.email}</p>
+
+        <p className="text-xs text-gold">
+          🌎 {userProfile.country}
+        </p>
+
+        <p className="text-xs text-gold">
+          👑 {userProfile.crowns || 0} crowns
+        </p>
+
+        <p className="text-xs text-gold">
+          💰 {formatCurrency(userProfile.seasonTotal || 0)} season total
+        </p>
+
+        <p className="text-xs text-gold">
+          ⚔️ Need{" "}
+          {formatCurrency(
+            Math.max(firebaseKing.amount - (userProfile.seasonTotal || 0) + 1, 0)
+          )}{" "}
+          to become king
+        </p>
+
+        <button
+          onClick={handleLogout}
+          className="mt-2 rounded-lg border border-gold/20 px-3 py-1 text-xs text-gold"
+        >
+          Logout
+        </button>
+      </div>
+    )
   ) : (
     <button
       onClick={handleLogin}
@@ -1171,19 +1327,6 @@ export default function Home() {
     onSubmit={handleBecomeKing}
     className="mt-6 w-full max-w-md space-y-3 rounded-2xl border border-gold/20 bg-black/40 p-5 text-left"
   >
-    <input
-      className="w-full rounded-xl border border-gold/20 bg-black/60 px-4 py-3 text-white outline-none"
-      placeholder="Your name"
-      value={formData.name}
-      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-    />
-
-    <input
-      className="w-full rounded-xl border border-gold/20 bg-black/60 px-4 py-3 text-white outline-none"
-      placeholder="Country"
-      value={formData.country}
-      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-    />
 
     <input
       className="w-full rounded-xl border border-gold/20 bg-black/60 px-4 py-3 text-white outline-none"
